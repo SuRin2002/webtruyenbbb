@@ -165,6 +165,32 @@
         </div>
     </div>
 
+    <!-- CUSTOM EDIT CHAPTER MODAL -->
+    <div id="edit-chapter-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-pop-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="text-base font-bold text-blue-400">✏️ Chỉnh Sửa Chương Truyện</h3>
+                <button onclick="closeEditChapterModal()" class="text-gray-400 hover:text-white font-bold text-lg">×</button>
+            </div>
+            <input type="hidden" id="edit-ch-story-id">
+            <input type="hidden" id="edit-ch-index">
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1 text-gray-300">Tiêu đề chương *</label>
+                    <input type="text" id="edit-ch-title" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1 text-gray-300">Nội dung chương *</label>
+                    <textarea id="edit-ch-content" rows="8" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button onclick="closeEditChapterModal()" class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 transition">Hủy</button>
+                <button onclick="saveEditedChapter()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-lg shadow-blue-600/30 transition">Lưu Chương</button>
+            </div>
+        </div>
+    </div>
+
     <!-- CUSTOM ADD CHAPTER MODAL -->
     <div id="add-chapter-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
         <div class="bg-gray-900 border border-gray-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-pop-in space-y-4">
@@ -191,7 +217,7 @@
 
     <!-- FOOTER -->
     <footer class="border-t border-gray-900 bg-gray-950/80 py-6 text-center text-xs text-gray-500">
-        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Admin Edit Ready.</p>
+        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Full Edit Ready.</p>
     </footer>
 
     <!-- FIREBASE & APP LOGIC -->
@@ -334,6 +360,46 @@
                 await saveStoryDB(story);
                 window.closeEditStoryModal();
                 window.showToast("Đã cập nhật thông tin truyện thành công!");
+                window.renderView();
+            }
+        };
+
+        window.openEditChapterModal = function(storyId, chapterIndex) {
+            const story = window.stories.find(s => String(s.id) === String(storyId));
+            if (!story || !story.chapters || !story.chapters[chapterIndex]) return;
+
+            const chapter = story.chapters[chapterIndex];
+            document.getElementById('edit-ch-story-id').value = storyId;
+            document.getElementById('edit-ch-index').value = chapterIndex;
+            document.getElementById('edit-ch-title').value = chapter.title || '';
+            document.getElementById('edit-ch-content').value = chapter.content || '';
+
+            document.getElementById('edit-chapter-modal').classList.remove('hidden');
+        };
+
+        window.closeEditChapterModal = function() {
+            document.getElementById('edit-chapter-modal').classList.add('hidden');
+        };
+
+        window.saveEditedChapter = async function() {
+            const storyId = document.getElementById('edit-ch-story-id').value;
+            const chapterIndex = parseInt(document.getElementById('edit-ch-index').value);
+            const title = document.getElementById('edit-ch-title').value.trim();
+            const content = document.getElementById('edit-ch-content').value.trim();
+
+            if (!title || !content) {
+                window.showToast("Tiêu đề và nội dung chương không được để trống!", "info");
+                return;
+            }
+
+            const story = window.stories.find(s => String(s.id) === String(storyId));
+            if (story && story.chapters && story.chapters[chapterIndex]) {
+                story.chapters[chapterIndex].title = title;
+                story.chapters[chapterIndex].content = content;
+
+                await saveStoryDB(story);
+                window.closeEditChapterModal();
+                window.showToast("Đã cập nhật chương thành công!");
                 window.renderView();
             }
         };
@@ -641,9 +707,12 @@
                         </div>
                         <div class="divide-y divide-gray-800 max-h-96 overflow-y-auto pr-1">
                             ${(story.chapters || []).map((ch, idx) => `
-                                <div onclick="router('read', {id: '${story.id}', chapter:${idx}})" class="py-3 px-3 hover:bg-gray-800/60 rounded-xl cursor-pointer flex justify-between items-center transition group">
-                                    <span class="text-xs sm:text-sm font-medium text-gray-300 group-hover:text-blue-400 transition">${ch.title || `Chương ${idx + 1}`}</span>
-                                    ${progress && progress.chapterIdx === idx ? '<span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-semibold">Đang đọc</span>' : ''}
+                                <div class="py-3 px-3 hover:bg-gray-800/60 rounded-xl flex justify-between items-center transition group">
+                                    <span onclick="router('read', {id: '${story.id}', chapter:${idx}})" class="text-xs sm:text-sm font-medium text-gray-300 group-hover:text-blue-400 transition cursor-pointer flex-1">${ch.title || `Chương ${idx + 1}`}</span>
+                                    <div class="flex items-center gap-2">
+                                        ${progress && progress.chapterIdx === idx ? '<span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-semibold">Đang đọc</span>' : ''}
+                                        ${window.isAdminLoggedIn ? `<button onclick="openEditChapterModal('${story.id}', ${idx})" class="px-2.5 py-1 bg-amber-600/70 hover:bg-amber-600 text-white rounded-lg text-[11px] font-semibold transition">✏️ Sửa</button>` : ''}
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
