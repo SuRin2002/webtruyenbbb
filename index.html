@@ -132,6 +132,39 @@
         </div>
     </div>
 
+    <!-- CUSTOM EDIT STORY MODAL -->
+    <div id="edit-story-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-pop-in space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="text-base font-bold text-blue-400">✏️ Chỉnh Sửa Thông Tin Truyện</h3>
+                <button onclick="closeEditStoryModal()" class="text-gray-400 hover:text-white font-bold text-lg">×</button>
+            </div>
+            <input type="hidden" id="edit-story-id">
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1 text-gray-300">Tên truyện *</label>
+                    <input type="text" id="edit-story-title" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1 text-gray-300">Tác giả</label>
+                    <input type="text" id="edit-story-author" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1 text-gray-300">Link Ảnh Bìa (URL)</label>
+                    <input type="url" id="edit-story-cover" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1 text-gray-300">Tóm tắt nội dung</label>
+                    <textarea id="edit-story-desc" rows="3" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3.5 py-2 text-xs focus:border-blue-500 focus:outline-none"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button onclick="closeEditStoryModal()" class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 transition">Hủy</button>
+                <button onclick="saveEditedStory()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-lg shadow-blue-600/30 transition">Lưu Thay Đổi</button>
+            </div>
+        </div>
+    </div>
+
     <!-- CUSTOM ADD CHAPTER MODAL -->
     <div id="add-chapter-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
         <div class="bg-gray-900 border border-gray-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl animate-pop-in space-y-4">
@@ -158,7 +191,7 @@
 
     <!-- FOOTER -->
     <footer class="border-t border-gray-900 bg-gray-950/80 py-6 text-center text-xs text-gray-500">
-        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Cached Instant Load.</p>
+        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Admin Edit Ready.</p>
     </footer>
 
     <!-- FIREBASE & APP LOGIC -->
@@ -181,7 +214,6 @@
 
         const ADMIN_PIN_CORRECT = '1234';
 
-        // Load ngay từ cache nếu có để hiển thị tức thì (giảm độ trễ)
         window.stories = JSON.parse(localStorage.getItem('cached_stories') || '[]');
         window.categories = ['Tiên Hiệp', 'Huyền Huyễn', 'Đô Thị', 'Ngôn Tình', 'Kiếm Hiệp', 'Xuyên Không', 'Trọng Sinh', 'Hệ Thống'];
         
@@ -262,6 +294,49 @@
         async function deleteStoryPermanentDB(id) {
             await deleteDoc(doc(dbFirestore, "stories", String(id)));
         }
+
+        window.openEditStoryModal = function(id) {
+            const story = window.stories.find(s => String(s.id) === String(id));
+            if (!story) return;
+
+            document.getElementById('edit-story-id').value = story.id;
+            document.getElementById('edit-story-title').value = story.title || '';
+            document.getElementById('edit-story-author').value = story.author || '';
+            document.getElementById('edit-story-cover').value = story.cover || '';
+            document.getElementById('edit-story-desc').value = story.description || '';
+
+            document.getElementById('edit-story-modal').classList.remove('hidden');
+        };
+
+        window.closeEditStoryModal = function() {
+            document.getElementById('edit-story-modal').classList.add('hidden');
+        };
+
+        window.saveEditedStory = async function() {
+            const id = document.getElementById('edit-story-id').value;
+            const title = document.getElementById('edit-story-title').value.trim();
+            const author = document.getElementById('edit-story-author').value.trim() || 'Ẩn danh';
+            const cover = document.getElementById('edit-story-cover').value.trim();
+            const description = document.getElementById('edit-story-desc').value.trim();
+
+            if (!title) {
+                window.showToast("Tên truyện không được để trống!", "info");
+                return;
+            }
+
+            const story = window.stories.find(s => String(s.id) === String(id));
+            if (story) {
+                story.title = title;
+                story.author = author;
+                story.cover = cover;
+                story.description = description;
+
+                await saveStoryDB(story);
+                window.closeEditStoryModal();
+                window.showToast("Đã cập nhật thông tin truyện thành công!");
+                window.renderView();
+            }
+        };
 
         window.saveProgress = function(storyId, chapterIdx) {
             const progress = JSON.parse(localStorage.getItem('reading_progress') || '{}');
@@ -546,6 +621,9 @@
                                 ${window.isAdminLoggedIn ? `
                                     <button onclick="openAddChapterModal('${story.id}')" class="px-4 py-2.5 bg-emerald-600/80 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-emerald-600/20">
                                         ➕ Thêm Chương Mới
+                                    </button>
+                                    <button onclick="openEditStoryModal('${story.id}')" class="px-3.5 py-2.5 bg-amber-600/80 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-amber-600/20">
+                                        ✏️ Sửa Truyện
                                     </button>
                                     <button onclick="softDeleteStory('${story.id}')" class="px-3 py-2.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-xl text-xs font-semibold border border-red-800/40 transition ml-auto">
                                         🗑️ Xóa Truyện
@@ -965,15 +1043,18 @@
                     </div>
 
                     <div class="bg-gray-900/90 rounded-2xl p-6 border border-gray-800 space-y-4">
-                        <h2 class="font-bold text-base text-gray-200">📖 Truyện Đang Hoạt Động Trên Cloud (${activeStories.length})</h2>
+                        <h2 class="font-bold text-base text-gray-200">📖 Quản Lý Truyện Đang Hoạt Động (${activeStories.length})</h2>
                         <div class="divide-y divide-gray-800 max-h-80 overflow-y-auto">
                             ${activeStories.map(s => `
                                 <div class="py-3 flex items-center justify-between gap-4">
                                     <div>
                                         <h4 class="font-semibold text-xs sm:text-sm text-gray-200">${s.title}</h4>
-                                        <p class="text-[11px] text-gray-400">${s.author}</p>
+                                        <p class="text-[11px] text-gray-400">${s.author} -${s.chapters ? s.chapters.length : 0} chương</p>
                                     </div>
-                                    <button onclick="softDeleteStory('${s.id}')" class="px-3 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/30 rounded-lg text-xs">Bỏ vào thùng rác</button>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="openEditStoryModal('${s.id}')" class="px-3 py-1 bg-amber-600/80 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold">Sửa</button>
+                                        <button onclick="softDeleteStory('${s.id}')" class="px-3 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/30 rounded-lg text-xs">Xóa</button>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1028,10 +1109,8 @@
             cancelBtn.onclick = () => cleanup();
         };
 
-        // Render ngay lập tức bằng dữ liệu cache (nếu có) để không bị trắng màn hình chờ mạng
         window.renderView();
 
-        // Lắng nghe dữ liệu thời gian thực từ Firestore và cập nhật cache ngầm
         onSnapshot(collection(dbFirestore, "stories"), (snapshot) => {
             const fetchedStories = [];
             snapshot.forEach((docSnap) => {
