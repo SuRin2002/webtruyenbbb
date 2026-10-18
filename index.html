@@ -158,13 +158,13 @@
 
     <!-- FOOTER -->
     <footer class="border-t border-gray-900 bg-gray-950/80 py-6 text-center text-xs text-gray-500">
-        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Quản lý truyện thông minh[cite: 1].</p>
+        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Cached Instant Load.</p>
     </footer>
 
     <!-- FIREBASE & APP LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBs2A6jiHqKte5k4Icv2BE1VuDqCy_p5KM",
@@ -181,7 +181,8 @@
 
         const ADMIN_PIN_CORRECT = '1234';
 
-        window.stories = [];
+        // Load ngay từ cache nếu có để hiển thị tức thì (giảm độ trễ)
+        window.stories = JSON.parse(localStorage.getItem('cached_stories') || '[]');
         window.categories = ['Tiên Hiệp', 'Huyền Huyễn', 'Đô Thị', 'Ngôn Tình', 'Kiếm Hiệp', 'Xuyên Không', 'Trọng Sinh', 'Hệ Thống'];
         
         window.isAdminLoggedIn = false;
@@ -190,8 +191,8 @@
 
         window.appSettings = JSON.parse(localStorage.getItem('app_admin_settings') || JSON.stringify({
             siteTitle: 'TruyệnHay',
-            heroHeading: 'Đọc Truyện Cloud Realtime Không Giới Hạn[cite: 1]',
-            heroSub: 'Đồng bộ thời gian thực đa thiết bị, tự do đăng truyện và tùy chỉnh giao diện đọc sách.',
+            heroHeading: 'Đọc Truyện Cloud Realtime Siêu Tốc',
+            heroSub: 'Đồng bộ thời gian thực, mở lên là đọc ngay không chờ đợi.',
             primaryFont: 'font-inter'
         }));
 
@@ -254,7 +255,6 @@
             window.router('home');
         };
 
-        // --- FIRESTORE SYNC FUNCTIONS ---
         async function saveStoryDB(story) {
             await setDoc(doc(dbFirestore, "stories", String(story.id)), story);
         }
@@ -419,10 +419,10 @@
             if (params.id) window.appState.selectedStoryId = params.id;
             if (params.chapter !== undefined) window.appState.selectedChapterIndex = params.chapter;
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            await window.renderView();
+            window.renderView();
         };
 
-        window.renderView = async function() {
+        window.renderView = function() {
             window.applyGlobalSettings();
             const viewport = document.getElementById('app-viewport');
             if(!viewport) return;
@@ -471,7 +471,7 @@
                     <!-- Story List -->
                     <div>
                         <h2 class="text-xl font-bold mb-5 flex items-center gap-2"><span>🔥</span> Danh Sách Truyện (${filtered.length})</h2>
-                        ${filtered.length === 0 ? `<div class="text-center py-16 bg-gray-900/50 rounded-2xl border border-gray-800/80"><p class="text-gray-400 text-sm">Chưa có truyện phù hợp.</p></div>` : `
+                        ${filtered.length === 0 ? `<div class="text-center py-16 bg-gray-900/50 rounded-2xl border border-gray-800/80"><p class="text-gray-400 text-sm">Đang tải dữ liệu từ cloud...</p></div>` : `
                             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
                                 ${filtered.map(story => `
                                     <div class="bg-gray-900/80 hover:bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 hover:border-blue-500/40 shadow-lg hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col group cursor-pointer" onclick="router('detail', {id: '${story.id}'})">
@@ -1028,15 +1028,17 @@
             cancelBtn.onclick = () => cleanup();
         };
 
-        // --- FIRESTORE REALTIME LISTENER ---
+        // Render ngay lập tức bằng dữ liệu cache (nếu có) để không bị trắng màn hình chờ mạng
+        window.renderView();
+
+        // Lắng nghe dữ liệu thời gian thực từ Firestore và cập nhật cache ngầm
         onSnapshot(collection(dbFirestore, "stories"), (snapshot) => {
-            window.stories = [];
+            const fetchedStories = [];
             snapshot.forEach((docSnap) => {
-                window.stories.push(docSnap.data());
+                fetchedStories.push(docSnap.data());
             });
 
-            // Nếu chưa có dữ liệu nào trên cloud, tự động đẩy truyện mẫu lên
-            if (window.stories.length === 0) {
+            if (fetchedStories.length === 0) {
                 const sampleStory = {
                     id: 'sample-1',
                     title: 'Toàn Trí Độc Giả (Cloud)',
@@ -1051,8 +1053,11 @@
                     ]
                 };
                 saveStoryDB(sampleStory);
+                return;
             }
 
+            window.stories = fetchedStories;
+            localStorage.setItem('cached_stories', JSON.stringify(fetchedStories));
             window.renderView();
         });
     </script>
