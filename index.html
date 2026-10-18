@@ -158,44 +158,44 @@
 
     <!-- FOOTER -->
     <footer class="border-t border-gray-900 bg-gray-950/80 py-6 text-center text-xs text-gray-500">
-        <p>© 2026 TruyệnHay Premium Reader. Đọc offline & Quản lý truyện thông minh[cite: 1].</p>
+        <p>© 2026 TruyệnHay Premium Reader. Cloud Realtime Sync & Quản lý truyện thông minh[cite: 1].</p>
     </footer>
 
-    <script>
-        const DB_NAME = 'FreeWebNovelDB';
-        const DB_VERSION = 1;
+    <!-- FIREBASE & APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBs2A6jiHqKte5k4Icv2BE1VuDqCy_p5KM",
+            authDomain: "quanly-62fb3.firebaseapp.com",
+            projectId: "quanly-62fb3",
+            storageBucket: "quanly-62fb3.firebasestorage.app",
+            messagingSenderId: "1029268847823",
+            appId: "1:1029268847823:web:db0d5abd45ecffa434cbba",
+            measurementId: "G-MBVYC0565M"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const dbFirestore = getFirestore(app);
+
         const ADMIN_PIN_CORRECT = '1234';
-        let db;
 
-        let isAdminLoggedIn = false;
-        let activeLibraryFolder = 'Tất cả';
-        let targetStoryForAddList = null;
+        window.stories = [];
+        window.categories = ['Tiên Hiệp', 'Huyền Huyễn', 'Đô Thị', 'Ngôn Tình', 'Kiếm Hiệp', 'Xuyên Không', 'Trọng Sinh', 'Hệ Thống'];
+        
+        window.isAdminLoggedIn = false;
+        window.activeLibraryFolder = 'Tất cả';
+        window.targetStoryForAddList = null;
 
-        const INITIAL_STORIES_DATA = [
-            {
-                id: 'sample-1',
-                title: 'Toàn Trí Độc Giả',
-                author: 'Sing N Song',
-                description: 'Bộ truyện thử nghiệm giao diện với đầy đủ tính năng đọc offline, tùy chỉnh giao diện và quản lý chương nâng cao.',
-                cover: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&q=80',
-                categories: ['Huyền Huyễn', 'Hệ Thống'],
-                tags: ['Action', 'Survival'],
-                isDeleted: false,
-                chapters: [
-                    { title: 'Chương 1: Mở đầu câu chuyện', content: 'Đây là nội dung chương 1 thử nghiệm.\n\nBạn có thể tự do chỉnh đổi font chữ, màu nền và kích thước chữ trên thanh công cụ phía trên!' },
-                    { title: 'Chương 2: Thế giới thay đổi', content: 'Nội dung chương 2. Sử dụng thanh Mục Lục xổ xuống để di chuyển giữa các chương nhanh chóng.' }
-                ]
-            }
-        ];
-
-        let appSettings = JSON.parse(localStorage.getItem('app_admin_settings') || JSON.stringify({
+        window.appSettings = JSON.parse(localStorage.getItem('app_admin_settings') || JSON.stringify({
             siteTitle: 'TruyệnHay',
-            heroHeading: 'Đọc Truyện Offline Không Giới Hạn[cite: 1]',
-            heroSub: 'Tải dữ liệu, tự do đăng truyện và tùy chỉnh giao diện đọc sách theo sở thích cá nhân.',
+            heroHeading: 'Đọc Truyện Cloud Realtime Không Giới Hạn[cite: 1]',
+            heroSub: 'Đồng bộ thời gian thực đa thiết bị, tự do đăng truyện và tùy chỉnh giao diện đọc sách.',
             primaryFont: 'font-inter'
         }));
 
-        let appState = {
+        window.appState = {
             currentView: 'home',
             selectedStoryId: null,
             selectedChapterIndex: 0,
@@ -207,10 +207,9 @@
             uploadChapterCount: 1
         };
 
-        const DEFAULT_CATEGORIES = ['Tiên Hiệp', 'Huyền Huyễn', 'Đô Thị', 'Ngôn Tình', 'Kiếm Hiệp', 'Xuyên Không', 'Trọng Sinh', 'Hệ Thống'];
-
-        function showToast(message, type = 'success') {
+        window.showToast = function(message, type = 'success') {
             const container = document.getElementById('toast-container');
+            if(!container) return;
             const toast = document.createElement('div');
             toast.className = "pointer-events-auto flex items-center gap-2 px-4 py-3 bg-gray-900 border border-gray-700/80 rounded-2xl shadow-2xl text-xs font-semibold text-gray-100 animate-slide-in backdrop-blur-md";
             toast.innerHTML = `<span>${type === 'success' ? '✨' : 'ℹ️'}</span> <span>${message}</span>`;
@@ -221,221 +220,136 @@
                 toast.style.transition = 'all 0.3s ease';
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
-        }
+        };
 
-        function handleAdminNavClick() {
-            if (isAdminLoggedIn) {
-                router('admin');
+        window.handleAdminNavClick = function() {
+            if (window.isAdminLoggedIn) {
+                window.router('admin');
             } else {
                 document.getElementById('admin-login-modal').classList.remove('hidden');
                 document.getElementById('admin-pin-input').value = '';
                 document.getElementById('admin-pin-input').focus();
             }
-        }
+        };
 
-        function closeAdminLoginModal() {
+        window.closeAdminLoginModal = function() {
             document.getElementById('admin-login-modal').classList.add('hidden');
-        }
+        };
 
-        function submitAdminLogin() {
+        window.submitAdminLogin = function() {
             const pin = document.getElementById('admin-pin-input').value.trim();
             if (pin === ADMIN_PIN_CORRECT) {
-                isAdminLoggedIn = true;
-                closeAdminLoginModal();
-                showToast("Đã đăng nhập quyền Admin!");
-                router('admin');
+                window.isAdminLoggedIn = true;
+                window.closeAdminLoginModal();
+                window.showToast("Đã đăng nhập quyền Admin!");
+                window.router('admin');
             } else {
-                showToast("Mã PIN không chính xác!", "info");
+                window.showToast("Mã PIN không chính xác!", "info");
             }
+        };
+
+        window.logoutAdmin = function() {
+            window.isAdminLoggedIn = false;
+            window.showToast("Đã thoát quyền Admin.");
+            window.router('home');
+        };
+
+        // --- FIRESTORE SYNC FUNCTIONS ---
+        async function saveStoryDB(story) {
+            await setDoc(doc(dbFirestore, "stories", String(story.id)), story);
         }
 
-        function logoutAdmin() {
-            isAdminLoggedIn = false;
-            showToast("Đã thoát quyền Admin.");
-            router('home');
+        async function deleteStoryPermanentDB(id) {
+            await deleteDoc(doc(dbFirestore, "stories", String(id)));
         }
 
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open(DB_NAME, DB_VERSION);
-                req.onupgradeneeded = (e) => {
-                    db = e.target.result;
-                    if (!db.objectStoreNames.contains('stories')) db.createObjectStore('stories', { keyPath: 'id' });
-                    if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'name' });
-                };
-                req.onsuccess = (e) => { db = e.target.result; seedInitialData().then(resolve); };
-                req.onerror = (e) => reject(e);
-            });
-        }
-
-        async function seedInitialData() {
-            const stories = await getAllStoriesRaw();
-            if (stories.length === 0) {
-                for (let s of INITIAL_STORIES_DATA) await saveStoryDB(s);
-            }
-            const cats = await getCategoriesDB();
-            if (cats.length === 0) for (let c of DEFAULT_CATEGORIES) await saveCategoryDB({ name: c });
-        }
-
-        function getAllStoriesRaw() {
-            return new Promise((resolve) => {
-                const tx = db.transaction('stories', 'readonly');
-                const store = tx.objectStore('stories');
-                const request = store.getAll();
-                request.onsuccess = () => resolve(request.result || []);
-            });
-        }
-
-        async function getAllActiveStories() { return (await getAllStoriesRaw()).filter(s => !s.isDeleted); }
-        async function getAllDeletedStories() { return (await getAllStoriesRaw()).filter(s => s.isDeleted); }
-
-        function saveStoryDB(story) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction('stories', 'readwrite');
-                const request = tx.objectStore('stories').put(story);
-                request.onsuccess = () => resolve();
-                request.onerror = (e) => reject(e);
-            });
-        }
-
-        function deleteStoryPermanentDB(id) {
-            return new Promise((resolve) => {
-                const tx = db.transaction('stories', 'readwrite');
-                tx.objectStore('stories').delete(id);
-                tx.oncomplete = () => resolve();
-            });
-        }
-
-        function getCategoriesDB() {
-            return new Promise((resolve) => {
-                const tx = db.transaction('categories', 'readonly');
-                const req = tx.objectStore('categories').getAll();
-                req.onsuccess = () => resolve((req.result || []).map(c => c.name));
-            });
-        }
-
-        function saveCategoryDB(categoryObj) {
-            return new Promise((resolve) => {
-                const tx = db.transaction('categories', 'readwrite');
-                tx.objectStore('categories').put(categoryObj);
-                tx.oncomplete = () => resolve();
-            });
-        }
-
-        function removeCategoryDB(name) {
-            return new Promise((resolve) => {
-                const tx = db.transaction('categories', 'readwrite');
-                tx.objectStore('categories').delete(name);
-                tx.oncomplete = () => resolve();
-            });
-        }
-
-        function showCustomModal(title, msg, onConfirm) {
-            const modal = document.getElementById('custom-modal');
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-msg').innerText = msg;
-            modal.classList.remove('hidden');
-
-            const confirmBtn = document.getElementById('modal-confirm-btn');
-            const cancelBtn = document.getElementById('modal-cancel-btn');
-
-            const cleanup = () => {
-                modal.classList.add('hidden');
-                confirmBtn.onclick = null;
-                cancelBtn.onclick = null;
-            };
-
-            confirmBtn.onclick = () => { cleanup(); onConfirm(); };
-            cancelBtn.onclick = () => cleanup();
-        }
-
-        function saveProgress(storyId, chapterIdx) {
+        window.saveProgress = function(storyId, chapterIdx) {
             const progress = JSON.parse(localStorage.getItem('reading_progress') || '{}');
             progress[storyId] = { chapterIdx, updatedAt: Date.now() };
             localStorage.setItem('reading_progress', JSON.stringify(progress));
-        }
+        };
 
-        function getProgress(storyId) {
+        window.getProgress = function(storyId) {
             return (JSON.parse(localStorage.getItem('reading_progress') || '{}'))[storyId] || null;
-        }
+        };
 
-        function toggleFavorite(storyId) {
+        window.toggleFavorite = function(storyId) {
             let favs = JSON.parse(localStorage.getItem('favorites') || '[]');
             if (favs.includes(storyId)) {
                 favs = favs.filter(id => id !== storyId);
-                showToast("Đã xóa khỏi Tủ Sách Yêu Thích");
+                window.showToast("Đã xóa khỏi Tủ Sách Yêu Thích");
             } else {
                 favs.push(storyId);
-                showToast("Đã thêm vào Tủ Sách Yêu Thích");
+                window.showToast("Đã thêm vào Tủ Sách Yêu Thích");
             }
             localStorage.setItem('favorites', JSON.stringify(favs));
-            renderView();
-        }
+            window.renderView();
+        };
 
-        function isFavorite(storyId) {
+        window.isFavorite = function(storyId) {
             return (JSON.parse(localStorage.getItem('favorites') || '[]')).includes(storyId);
-        }
+        };
 
-        function getLibraryFolders() {
-            return JSON.parse(localStorage.getItem('library_folders') || '["Yêu thích", "HE", "Sủng, ngọt", "Cao H"]');
-        }
+        window.getLibraryFolders = function() {
+            return JSON.parse(localStorage.getItem('library_folders') || '["Yêu thích", "HE", "Sủng, ngọt"]');
+        };
 
-        function saveLibraryFolders(folders) {
+        window.saveLibraryFolders = function(folders) {
             localStorage.setItem('library_folders', JSON.stringify(folders));
-        }
+        };
 
-        function addLibraryFolder(folderName) {
-            let folders = getLibraryFolders();
+        window.addLibraryFolder = function(folderName) {
+            let folders = window.getLibraryFolders();
             if (folderName && !folders.includes(folderName)) {
                 folders.push(folderName);
-                saveLibraryFolders(folders);
-                showToast(`Đã tạo danh sách đọc "${folderName}"`);
+                window.saveLibraryFolders(folders);
+                window.showToast(`Đã tạo danh sách đọc "${folderName}"`);
             }
-        }
+        };
 
-        function deleteLibraryFolder(folderName) {
-            showCustomModal("Xóa danh sách", `Bạn có muốn xóa danh sách đọc "${folderName}" không?`, () => {
-                let folders = getLibraryFolders().filter(f => f !== folderName);
-                saveLibraryFolders(folders);
-                showToast(`Đã xóa danh sách "${folderName}"`);
-                renderView();
+        window.deleteLibraryFolder = function(folderName) {
+            window.showCustomModal("Xóa danh sách", `Bạn có muốn xóa danh sách đọc "${folderName}" không?`, () => {
+                let folders = window.getLibraryFolders().filter(f => f !== folderName);
+                window.saveLibraryFolders(folders);
+                window.showToast(`Đã xóa danh sách "${folderName}"`);
+                window.renderView();
             });
-        }
+        };
 
-        function getStoryListsMap() {
+        window.getStoryListsMap = function() {
             return JSON.parse(localStorage.getItem('story_lists_map') || '{}');
-        }
+        };
 
-        function toggleStoryInList(storyId, listName) {
-            let map = getStoryListsMap();
+        window.toggleStoryInList = function(storyId, listName) {
+            let map = window.getStoryListsMap();
             if (!map[storyId]) map[storyId] = [];
             
             if (map[storyId].includes(listName)) {
                 map[storyId] = map[storyId].filter(l => l !== listName);
-                showToast(`Đã xóa khỏi danh sách "${listName}"`);
+                window.showToast(`Đã xóa khỏi danh sách "${listName}"`);
             } else {
                 map[storyId].push(listName);
-                showToast(`Đã thêm vào danh sách "${listName}"`);
+                window.showToast(`Đã thêm vào danh sách "${listName}"`);
             }
             localStorage.setItem('story_lists_map', JSON.stringify(map));
-            renderAddToListModalContent();
-        }
+            window.renderAddToListModalContent();
+        };
 
-        function removeStoryFromCurrentList(storyId, listName) {
+        window.removeStoryFromCurrentList = function(storyId, listName) {
             if (listName === 'Tất cả') {
-                toggleFavorite(storyId);
+                window.toggleFavorite(storyId);
             } else {
-                let map = getStoryListsMap();
+                let map = window.getStoryListsMap();
                 if (map[storyId]) {
                     map[storyId] = map[storyId].filter(l => l !== listName);
                     localStorage.setItem('story_lists_map', JSON.stringify(map));
-                    showToast(`Đã xóa khỏi danh sách "${listName}"`);
-                    renderView();
+                    window.showToast(`Đã xóa khỏi danh sách "${listName}"`);
+                    window.renderView();
                 }
             }
-        }
+        };
 
-        function toggleStoryMenuOptions(storyId, e) {
+        window.toggleStoryMenuOptions = function(storyId, e) {
             e.stopPropagation();
             const menu = document.getElementById(`story-option-menu-${storyId}`);
             if (menu) {
@@ -443,93 +357,92 @@
                 document.querySelectorAll('.story-option-popover').forEach(m => m.classList.add('hidden'));
                 if (isHidden) menu.classList.remove('hidden');
             }
-        }
+        };
 
-        function openAddToListModal(storyId) {
-            targetStoryForAddList = storyId;
-            renderAddToListModalContent();
+        window.openAddToListModal = function(storyId) {
+            window.targetStoryForAddList = storyId;
+            window.renderAddToListModalContent();
             document.getElementById('add-to-list-modal').classList.remove('hidden');
-        }
+        };
 
-        function closeAddToListModal() {
+        window.closeAddToListModal = function() {
             document.getElementById('add-to-list-modal').classList.add('hidden');
-            renderView();
-        }
+            window.renderView();
+        };
 
-        function renderAddToListModalContent() {
+        window.renderAddToListModalContent = function() {
             const container = document.getElementById('user-lists-container');
-            const folders = getLibraryFolders();
-            const map = getStoryListsMap();
-            const currentLists = map[targetStoryForAddList] || [];
+            const folders = window.getLibraryFolders();
+            const map = window.getStoryListsMap();
+            const currentLists = map[window.targetStoryForAddList] || [];
 
             container.innerHTML = folders.map(listName => {
                 const isChecked = currentLists.includes(listName);
                 return `
-                    <div onclick="toggleStoryInList('${targetStoryForAddList}', '${listName}')" class="flex items-center justify-between p-2.5 bg-gray-950 rounded-xl border border-gray-800 hover:border-blue-500/50 cursor-pointer transition">
+                    <div onclick="toggleStoryInList('${window.targetStoryForAddList}', '${listName}')" class="flex items-center justify-between p-2.5 bg-gray-950 rounded-xl border border-gray-800 hover:border-blue-500/50 cursor-pointer transition">
                         <span class="text-xs font-semibold text-gray-200">🗂️ ${listName}</span>
                         <span class="text-sm">${isChecked ? '🩵' : '⚪'}</span>
                     </div>
                 `;
             }).join('');
-        }
+        };
 
-        function handleCreateNewListFromModal() {
+        window.handleCreateNewListFromModal = function() {
             const input = document.getElementById('modal-new-list-input');
             const val = input.value.trim();
             if (val) {
-                addLibraryFolder(val);
+                window.addLibraryFolder(val);
                 input.value = '';
-                renderAddToListModalContent();
+                window.renderAddToListModalContent();
             } else {
-                showToast("Vui lòng nhập tên danh sách đọc!", "info");
+                window.showToast("Vui lòng nhập tên danh sách đọc!", "info");
             }
-        }
+        };
 
-        function applyGlobalSettings() {
-            document.getElementById('app-body').className = `bg-gray-950 text-gray-100 min-h-screen flex flex-col selection:bg-blue-500 selection:text-white transition-colors ${appSettings.primaryFont}`;
+        window.applyGlobalSettings = function() {
+            document.getElementById('app-body').className = `bg-gray-950 text-gray-100 min-h-screen flex flex-col selection:bg-blue-500 selection:text-white transition-colors ${window.appSettings.primaryFont}`;
             const titleEl = document.getElementById('nav-title');
-            if (titleEl) titleEl.innerText = appSettings.siteTitle || 'TruyệnHay';
+            if (titleEl) titleEl.innerText = window.appSettings.siteTitle || 'TruyệnHay';
 
             const adminBtn = document.getElementById('nav-admin-btn');
             if (adminBtn) {
-                adminBtn.innerHTML = isAdminLoggedIn ? '⚙️ <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-gray-900"></span>' : '⚙️';
+                adminBtn.innerHTML = window.isAdminLoggedIn ? '⚙️ <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-gray-900"></span>' : '⚙️';
             }
-        }
+        };
 
-        async function router(view, params = {}) {
-            if (view === 'admin' && !isAdminLoggedIn) {
-                handleAdminNavClick();
+        window.router = async function(view, params = {}) {
+            if (view === 'admin' && !window.isAdminLoggedIn) {
+                window.handleAdminNavClick();
                 return;
             }
-            appState.currentView = view;
-            if (params.id) appState.selectedStoryId = params.id;
-            if (params.chapter !== undefined) appState.selectedChapterIndex = params.chapter;
+            window.appState.currentView = view;
+            if (params.id) window.appState.selectedStoryId = params.id;
+            if (params.chapter !== undefined) window.appState.selectedChapterIndex = params.chapter;
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            await renderView();
-        }
+            await window.renderView();
+        };
 
-        async function renderView() {
-            applyGlobalSettings();
+        window.renderView = async function() {
+            window.applyGlobalSettings();
             const viewport = document.getElementById('app-viewport');
+            if(!viewport) return;
             viewport.className = "flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 animate-fade-in";
-            switch (appState.currentView) {
-                case 'home': viewport.innerHTML = await renderHome(); break;
-                case 'detail': viewport.innerHTML = await renderDetail(); break;
-                case 'read': viewport.innerHTML = await renderReader(); break;
-                case 'upload': viewport.innerHTML = await renderUpload(); break;
-                case 'library': viewport.innerHTML = await renderLibrary(); break;
-                case 'admin': viewport.innerHTML = await renderAdmin(); break;
-                default: viewport.innerHTML = await renderHome();
+            switch (window.appState.currentView) {
+                case 'home': viewport.innerHTML = window.renderHome(); break;
+                case 'detail': viewport.innerHTML = window.renderDetail(); break;
+                case 'read': viewport.innerHTML = window.renderReader(); break;
+                case 'upload': viewport.innerHTML = window.renderUpload(); break;
+                case 'library': viewport.innerHTML = window.renderLibrary(); break;
+                case 'admin': viewport.innerHTML = window.renderAdmin(); break;
+                default: viewport.innerHTML = window.renderHome();
             }
-        }
+        };
 
-        async function renderHome() {
-            const stories = await getAllActiveStories();
-            const categories = await getCategoriesDB();
-
-            const filtered = stories.filter(s => {
-                const matchesCat = appState.selectedCategory === 'Tất cả' || (s.categories && s.categories.includes(appState.selectedCategory));
-                const matchesSearch = s.title.toLowerCase().includes(appState.searchQuery.toLowerCase()) || s.author.toLowerCase().includes(appState.searchQuery.toLowerCase());
+        window.renderHome = function() {
+            const activeStories = window.stories.filter(s => !s.isDeleted);
+            const filtered = activeStories.filter(s => {
+                const matchesCat = window.appState.selectedCategory === 'Tất cả' || (s.categories && s.categories.includes(window.appState.selectedCategory));
+                const matchesSearch = s.title.toLowerCase().includes(window.appState.searchQuery.toLowerCase()) || s.author.toLowerCase().includes(window.appState.searchQuery.toLowerCase());
                 return matchesCat && matchesSearch;
             });
 
@@ -538,9 +451,9 @@
                     <!-- Hero Banner -->
                     <div class="relative rounded-3xl bg-gradient-to-r from-blue-900/60 via-indigo-900/40 to-purple-900/40 p-6 sm:p-10 border border-blue-500/20 shadow-2xl overflow-hidden backdrop-blur-xl">
                         <div class="relative z-10 max-w-2xl space-y-3">
-                            <span class="px-3 py-1 bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold rounded-full">Trải nghiệm đọc đỉnh cao</span>
-                            <h1 class="text-3xl sm:text-4xl font-extrabold text-white leading-tight">${appSettings.heroHeading}</h1>
-                            <p class="text-sm sm:text-base text-gray-300">${appSettings.heroSub}</p>
+                            <span class="px-3 py-1 bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold rounded-full">Trải nghiệm Cloud Realtime</span>
+                            <h1 class="text-3xl sm:text-4xl font-extrabold text-white leading-tight">${window.appSettings.heroHeading}</h1>
+                            <p class="text-sm sm:text-base text-gray-300">${window.appSettings.heroSub}</p>
                             <button onclick="router('upload')" class="mt-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/30 transition hover:scale-105 active:scale-95">
                                 🚀 Đăng Truyện Mới
                             </button>
@@ -549,9 +462,9 @@
 
                     <!-- Category Pills -->
                     <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                        <button onclick="setCategoryFilter('Tất cả')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${appState.selectedCategory === 'Tất cả' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white border border-gray-800'}">Tất cả</button>
-                        ${categories.map(cat => `
-                            <button onclick="setCategoryFilter('${cat}')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${appState.selectedCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white border border-gray-800'}">${cat}</button>
+                        <button onclick="setCategoryFilter('Tất cả')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${window.appState.selectedCategory === 'Tất cả' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white border border-gray-800'}">Tất cả</button>
+                        ${window.categories.map(cat => `
+                            <button onclick="setCategoryFilter('${cat}')" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap ${window.appState.selectedCategory === cat ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white border border-gray-800'}">${cat}</button>
                         `).join('')}
                     </div>
 
@@ -565,7 +478,7 @@
                                         <div class="aspect-[3/4] bg-gray-950 relative overflow-hidden">
                                             <img src="${story.cover || 'https://via.placeholder.com/300x400'}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                                             <button onclick="event.stopPropagation(); toggleFavorite('${story.id}')" class="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-gray-950/70 backdrop-blur-md flex items-center justify-center text-sm shadow-md hover:scale-110 transition">
-                                                ${isFavorite(story.id) ? '❤️' : '🤍'}
+                                                ${window.isFavorite(story.id) ? '❤️' : '🤍'}
                                             </button>
                                             <span class="absolute bottom-2 left-2 bg-gray-950/80 backdrop-blur-md text-blue-400 text-[11px] font-semibold px-2 py-0.5 rounded-md border border-blue-500/20">${story.chapters ? story.chapters.length : 0} Chương</span>
                                         </div>
@@ -585,17 +498,16 @@
                     </div>
                 </div>
             `;
-        }
+        };
 
-        function setCategoryFilter(cat) { appState.selectedCategory = cat; renderView(); }
-        function handleSearch(val) { appState.searchQuery = val; renderView(); }
+        window.setCategoryFilter = function(cat) { window.appState.selectedCategory = cat; window.renderView(); };
+        window.handleSearch = function(val) { window.appState.searchQuery = val; window.renderView(); };
 
-        async function renderDetail() {
-            const stories = await getAllStoriesRaw();
-            const story = stories.find(s => s.id === appState.selectedStoryId);
+        window.renderDetail = function() {
+            const story = window.stories.find(s => String(s.id) === String(window.appState.selectedStoryId));
             if (!story) return `<div class="text-center py-16"><p class="text-red-400">Không tìm thấy truyện!</p></div>`;
 
-            const progress = getProgress(story.id);
+            const progress = window.getProgress(story.id);
 
             return `
                 <div class="max-w-4xl mx-auto space-y-6">
@@ -624,14 +536,14 @@
                                 ` : `<button disabled class="px-5 py-2.5 bg-gray-800 text-gray-500 rounded-xl text-xs font-semibold">Chưa có chương</button>`}
                                 
                                 <button onclick="toggleFavorite('${story.id}')" class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs font-semibold transition">
-                                    ${isFavorite(story.id) ? '❤️ Đã Thích' : '🤍 Yêu Thích'}
+                                    ${window.isFavorite(story.id) ? '❤️ Đã Thích' : '🤍 Yêu Thích'}
                                 </button>
 
                                 <button onclick="openAddToListModal('${story.id}')" class="px-4 py-2.5 bg-indigo-600/80 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-indigo-600/20 flex items-center gap-1">
                                     📚 Thêm Vào Danh Sách
                                 </button>
                                 
-                                ${isAdminLoggedIn ? `
+                                ${window.isAdminLoggedIn ? `
                                     <button onclick="openAddChapterModal('${story.id}')" class="px-4 py-2.5 bg-emerald-600/80 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-emerald-600/20">
                                         ➕ Thêm Chương Mới
                                     </button>
@@ -647,7 +559,7 @@
                     <div class="bg-gray-900/90 rounded-3xl p-6 border border-gray-800 space-y-4">
                         <div class="flex justify-between items-center">
                             <h2 class="text-base sm:text-lg font-bold">Danh Sách Chương (${story.chapters ? story.chapters.length : 0})</h2>
-                            ${isAdminLoggedIn ? `<button onclick="openAddChapterModal('${story.id}')" class="text-xs font-semibold text-blue-400 hover:underline">➕ Thêm chương mới</button>` : ''}
+                            ${window.isAdminLoggedIn ? `<button onclick="openAddChapterModal('${story.id}')" class="text-xs font-semibold text-blue-400 hover:underline">➕ Thêm chương mới</button>` : ''}
                         </div>
                         <div class="divide-y divide-gray-800 max-h-96 overflow-y-auto pr-1">
                             ${(story.chapters || []).map((ch, idx) => `
@@ -660,9 +572,9 @@
                     </div>
                 </div>
             `;
-        }
+        };
 
-        function openAddChapterModal(storyId) {
+        window.openAddChapterModal = function(storyId) {
             const modal = document.getElementById('add-chapter-modal');
             document.getElementById('modal-ch-title').value = '';
             document.getElementById('modal-ch-content').value = '';
@@ -672,49 +584,45 @@
                 const title = document.getElementById('modal-ch-title').value.trim();
                 const content = document.getElementById('modal-ch-content').value.trim();
                 if (!title || !content) {
-                    showToast("Vui lòng điền đủ tiêu đề và nội dung chương!", "info");
+                    window.showToast("Vui lòng điền đủ tiêu đề và nội dung chương!", "info");
                     return;
                 }
 
-                const stories = await getAllStoriesRaw();
-                const story = stories.find(s => s.id === storyId);
+                const story = window.stories.find(s => String(s.id) === String(storyId));
                 if (story) {
                     if (!story.chapters) story.chapters = [];
                     story.chapters.push({ title, content });
                     await saveStoryDB(story);
-                    closeAddChapterModal();
-                    showToast("Đã thêm chương mới thành công!");
-                    renderView();
+                    window.closeAddChapterModal();
+                    window.showToast("Đã thêm chương mới lên cloud thành công!");
                 }
             };
-        }
+        };
 
-        function closeAddChapterModal() {
+        window.closeAddChapterModal = function() {
             document.getElementById('add-chapter-modal').classList.add('hidden');
-        }
+        };
 
-        function softDeleteStory(id) {
-            showCustomModal("Xóa truyện", "Bạn có chắc chắn muốn chuyển bộ truyện này vào Thùng Rác?", async () => {
-                const stories = await getAllStoriesRaw();
-                const story = stories.find(s => s.id === id);
+        window.softDeleteStory = function(id) {
+            window.showCustomModal("Xóa truyện", "Bạn có chắc chắn muốn chuyển bộ truyện này vào Thùng Rác?", async () => {
+                const story = window.stories.find(s => String(s.id) === String(id));
                 if (story) {
                     story.isDeleted = true;
                     await saveStoryDB(story);
-                    showToast("Đã chuyển truyện vào Thùng Rác");
-                    router('home');
+                    window.showToast("Đã chuyển truyện vào Thùng Rác");
+                    window.router('home');
                 }
             });
-        }
+        };
 
-        async function renderReader() {
-            const stories = await getAllStoriesRaw();
-            const story = stories.find(s => s.id === appState.selectedStoryId);
-            if (!story || !story.chapters || !story.chapters[appState.selectedChapterIndex]) {
+        window.renderReader = function() {
+            const story = window.stories.find(s => String(s.id) === String(window.appState.selectedStoryId));
+            if (!story || !story.chapters || !story.chapters[window.appState.selectedChapterIndex]) {
                 return `<div class="text-center py-16"><p class="text-red-400">Chương không tồn tại!</p></div>`;
             }
 
-            const chapter = story.chapters[appState.selectedChapterIndex];
-            saveProgress(story.id, appState.selectedChapterIndex);
+            const chapter = story.chapters[window.appState.selectedChapterIndex];
+            window.saveProgress(story.id, window.appState.selectedChapterIndex);
 
             return `
                 <div class="max-w-4xl mx-auto space-y-4">
@@ -724,11 +632,11 @@
 
                         <div class="relative inline-block">
                             <button onclick="toggleTOCMenu()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-xl font-semibold flex items-center gap-1 border border-gray-700">
-                                ≡ Mục Lục (${appState.selectedChapterIndex + 1}/${story.chapters.length})
+                                ≡ Mục Lục (${window.appState.selectedChapterIndex + 1}/${story.chapters.length})
                             </button>
                             <div id="toc-popup-menu" class="hidden absolute left-0 mt-2 w-64 max-h-80 overflow-y-auto bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl z-50 p-2 divide-y divide-gray-800">
                                 ${story.chapters.map((ch, idx) => `
-                                    <button onclick="router('read', {id: '${story.id}', chapter:${idx}}); toggleTOCMenu();" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-800 rounded-xl transition ${idx === appState.selectedChapterIndex ? 'text-blue-400 font-bold bg-blue-950/30' : 'text-gray-300'}">
+                                    <button onclick="router('read', {id: '${story.id}', chapter:${idx}}); toggleTOCMenu();" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-800 rounded-xl transition ${idx === window.appState.selectedChapterIndex ? 'text-blue-400 font-bold bg-blue-950/30' : 'text-gray-300'}">
                                         ${ch.title || `Chương ${idx + 1}`}
                                     </button>
                                 `).join('')}
@@ -736,15 +644,15 @@
                         </div>
 
                         <select onchange="changeReaderFont(this.value)" class="bg-gray-950 border border-gray-800 rounded-xl px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none">
-                            <option value="font-inter" ${appState.readerFont === 'font-inter' ? 'selected' : ''}>Inter (Mặc định)</option>
-                            <option value="font-lora" ${appState.readerFont === 'font-lora' ? 'selected' : ''}>Lora (Có chân)</option>
-                            <option value="font-merriweather" ${appState.readerFont === 'font-merriweather' ? 'selected' : ''}>Merriweather</option>
-                            <option value="font-mono" ${appState.readerFont === 'font-mono' ? 'selected' : ''}>Monospace</option>
+                            <option value="font-inter" ${window.appState.readerFont === 'font-inter' ? 'selected' : ''}>Inter (Mặc định)</option>
+                            <option value="font-lora" ${window.appState.readerFont === 'font-lora' ? 'selected' : ''}>Lora (Có chân)</option>
+                            <option value="font-merriweather" ${window.appState.readerFont === 'font-merriweather' ? 'selected' : ''}>Merriweather</option>
+                            <option value="font-mono" ${window.appState.readerFont === 'font-mono' ? 'selected' : ''}>Monospace</option>
                         </select>
 
                         <div class="flex items-center gap-1 bg-gray-950 px-2 py-1 rounded-xl border border-gray-800">
                             <button onclick="adjustReaderSize(-2)" class="px-2 font-bold hover:text-blue-400">A-</button>
-                            <span class="text-xs w-6 text-center font-medium">${appState.readerSize}</span>
+                            <span class="text-xs w-6 text-center font-medium">${window.appState.readerSize}</span>
                             <button onclick="adjustReaderSize(2)" class="px-2 font-bold hover:text-blue-400">A+</button>
                         </div>
 
@@ -757,51 +665,50 @@
                     </div>
 
                     <!-- Reader Content -->
-                    <div id="reader-content-box" class="${appState.readerTheme} ${appState.readerFont} rounded-3xl p-6 sm:p-12 border border-gray-800 shadow-2xl transition-all duration-200" style="font-size: ${appState.readerSize}px; line-height: 1.8;">
+                    <div id="reader-content-box" class="${window.appState.readerTheme} ${window.appState.readerFont} rounded-3xl p-6 sm:p-12 border border-gray-800 shadow-2xl transition-all duration-200" style="font-size: ${window.appState.readerSize}px; line-height: 1.8;">
                         <h1 class="text-2xl sm:text-3xl font-extrabold mb-8 text-center border-b pb-6 border-gray-700/30">${chapter.title}</h1>
                         <div class="whitespace-pre-wrap">${chapter.content}</div>
                     </div>
 
                     <!-- Bottom Nav -->
                     <div class="flex items-center justify-between py-4">
-                        <button onclick="router('read', {id: '${story.id}', chapter: ${appState.selectedChapterIndex - 1}})" ${appState.selectedChapterIndex <= 0 ? 'disabled class="opacity-40 cursor-not-allowed px-4 py-2 bg-gray-900 rounded-xl text-xs font-semibold"' : 'class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"'}>← Chương trước</button>
-                        <span class="text-xs text-gray-500 font-semibold">${appState.selectedChapterIndex + 1} / ${story.chapters.length}</span>
-                        <button onclick="router('read', {id: '${story.id}', chapter: ${appState.selectedChapterIndex + 1}})" ${appState.selectedChapterIndex >= story.chapters.length - 1 ? 'disabled class="opacity-40 cursor-not-allowed px-4 py-2 bg-gray-900 rounded-xl text-xs font-semibold"' : 'class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"'}>Chương sau →</button>
+                        <button onclick="router('read', {id: '${story.id}', chapter: ${window.appState.selectedChapterIndex - 1}})" ${window.appState.selectedChapterIndex <= 0 ? 'disabled class="opacity-40 cursor-not-allowed px-4 py-2 bg-gray-900 rounded-xl text-xs font-semibold"' : 'class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"'}>← Chương trước</button>
+                        <span class="text-xs text-gray-500 font-semibold">${window.appState.selectedChapterIndex + 1} / ${story.chapters.length}</span>
+                        <button onclick="router('read', {id: '${story.id}', chapter: ${window.appState.selectedChapterIndex + 1}})" ${window.appState.selectedChapterIndex >= story.chapters.length - 1 ? 'disabled class="opacity-40 cursor-not-allowed px-4 py-2 bg-gray-900 rounded-xl text-xs font-semibold"' : 'class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition"'}>Chương sau →</button>
                     </div>
                 </div>
             `;
-        }
+        };
 
-        function toggleTOCMenu() {
+        window.toggleTOCMenu = function() {
             const menu = document.getElementById('toc-popup-menu');
             if (menu) menu.classList.toggle('hidden');
-        }
+        };
 
-        function changeReaderFont(fontClass) {
-            appState.readerFont = fontClass;
+        window.changeReaderFont = function(fontClass) {
+            window.appState.readerFont = fontClass;
             const box = document.getElementById('reader-content-box');
-            if (box) box.className = `${appState.readerTheme} ${fontClass} rounded-3xl p-6 sm:p-12 border border-gray-800 shadow-2xl transition-all duration-200`;
-        }
+            if (box) box.className = `${window.appState.readerTheme} ${fontClass} rounded-3xl p-6 sm:p-12 border border-gray-800 shadow-2xl transition-all duration-200`;
+        };
 
-        function adjustReaderSize(delta) {
-            appState.readerSize = Math.max(12, Math.min(32, appState.readerSize + delta));
+        window.adjustReaderSize = function(delta) {
+            window.appState.readerSize = Math.max(12, Math.min(32, window.appState.readerSize + delta));
             const box = document.getElementById('reader-content-box');
-            if (box) box.style.fontSize = `${appState.readerSize}px`;
-        }
+            if (box) box.style.fontSize = `${window.appState.readerSize}px`;
+        };
 
-        function setReaderTheme(themeClass) {
-            appState.readerTheme = themeClass;
+        window.setReaderTheme = function(themeClass) {
+            window.appState.readerTheme = themeClass;
             const box = document.getElementById('reader-content-box');
-            if (box) box.className = `${themeClass} ${appState.readerFont} rounded-3xl p-6 sm:p-12 border border-gray-800 shadow-2xl transition-all duration-200`;
-        }
+            if (box) box.className = `${themeClass} ${window.appState.readerFont} rounded-3xl p-6 sm:p-12 border border-gray-800 shadow-2xl transition-all duration-200`;
+        };
 
-        async function renderUpload() {
-            const categories = await getCategoriesDB();
-            appState.uploadChapterCount = 1;
+        window.renderUpload = function() {
+            window.appState.uploadChapterCount = 1;
 
             return `
                 <div class="max-w-2xl mx-auto bg-gray-900/90 rounded-3xl p-6 sm:p-8 border border-gray-800 shadow-2xl space-y-6">
-                    <h1 class="text-2xl font-bold flex items-center gap-2"><span>✍️</span> Đăng Truyện Mới</h1>
+                    <h1 class="text-2xl font-bold flex items-center gap-2"><span>✍️</span> Đăng Truyện Mới Lên Cloud</h1>
                     <form onsubmit="handleUploadSubmit(event)" class="space-y-5">
                         <div>
                             <label class="block text-xs font-semibold mb-1 text-gray-300">Tên truyện *</label>
@@ -809,7 +716,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold mb-1 text-gray-300">Tác giả</label>
-                            <input type="text" id="up-author" placeholder="Ví dụ: Nam Cao" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none">
+                            <input type="text" id="up-author" placeholder="Ví dụ: Tác giả..." class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:border-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold mb-1 text-gray-300">Link Ảnh Bìa (URL)</label>
@@ -818,7 +725,7 @@
                         <div>
                             <label class="block text-xs font-semibold mb-1 text-gray-300">Thể loại (Chọn nhiều)</label>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-950 p-3 rounded-2xl border border-gray-800 max-h-36 overflow-y-auto">
-                                ${categories.map(c => `
+                                ${window.categories.map(c => `
                                     <label class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
                                         <input type="checkbox" name="up-categories" value="${c}" class="rounded bg-gray-800 border-gray-700 text-blue-600">
                                         <span>${c}</span>
@@ -850,29 +757,29 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-bold rounded-2xl text-white shadow-xl shadow-blue-600/20 transition">🚀 Hoàn Tất & Đăng Truyện</button>
+                        <button type="submit" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-bold rounded-2xl text-white shadow-xl shadow-blue-600/20 transition">🚀 Đăng Truyện Lên Cloud</button>
                     </form>
                 </div>
             `;
-        }
+        };
 
-        function addMoreUploadChapterField() {
-            appState.uploadChapterCount++;
+        window.addMoreUploadChapterField = function() {
+            window.appState.uploadChapterCount++;
             const container = document.getElementById('upload-chapters-list');
             const div = document.createElement('div');
             div.className = "upload-chapter-item bg-gray-950/60 p-4 rounded-2xl border border-gray-800 space-y-2";
             div.innerHTML = `
                 <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-gray-400">Chương ${appState.uploadChapterCount}</span>
+                    <span class="text-xs font-bold text-gray-400">Chương ${window.appState.uploadChapterCount}</span>
                     <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-xs text-red-400 hover:underline">Xóa chương này</button>
                 </div>
-                <input type="text" class="up-ch-title w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-semibold text-blue-300" placeholder="Tiêu đề (VD: Chương ${appState.uploadChapterCount})">
+                <input type="text" class="up-ch-title w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs font-semibold text-blue-300" placeholder="Tiêu đề (VD: Chương ${window.appState.uploadChapterCount})">
                 <textarea class="up-ch-content w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-xs" rows="4" placeholder="Nội dung chương..."></textarea>
             `;
             container.appendChild(div);
-        }
+        };
 
-        async function handleUploadSubmit(e) {
+        window.handleUploadSubmit = async function(e) {
             e.preventDefault();
             const title = document.getElementById('up-title').value.trim();
             const author = document.getElementById('up-author').value.trim() || 'Ẩn danh';
@@ -891,7 +798,7 @@
             });
 
             if (chapters.length === 0) {
-                showToast("Vui lòng nhập ít nhất một chương truyện!", "info");
+                window.showToast("Vui lòng nhập ít nhất một chương truyện!", "info");
                 return;
             }
 
@@ -903,21 +810,21 @@
             };
 
             await saveStoryDB(newStory);
-            showToast("Đã đăng truyện thành công!");
-            router('detail', { id: newStory.id });
-        }
+            window.showToast("Đã đăng truyện lên cloud thành công!");
+            window.router('detail', { id: newStory.id });
+        };
 
-        async function renderLibrary() {
-            const stories = await getAllActiveStories();
+        window.renderLibrary = function() {
+            const activeStories = window.stories.filter(s => !s.isDeleted);
             const favIds = JSON.parse(localStorage.getItem('favorites') || '[]');
-            const folders = getLibraryFolders();
-            const map = getStoryListsMap();
+            const folders = window.getLibraryFolders();
+            const map = window.getStoryListsMap();
 
-            let filteredStories = stories.filter(s => favIds.includes(s.id));
-            if (activeLibraryFolder !== 'Tất cả') {
-                filteredStories = stories.filter(s => {
+            let filteredStories = activeStories.filter(s => favIds.includes(s.id));
+            if (window.activeLibraryFolder !== 'Tất cả') {
+                filteredStories = activeStories.filter(s => {
                     const userLists = map[s.id] || [];
-                    return userLists.includes(activeLibraryFolder);
+                    return userLists.includes(window.activeLibraryFolder);
                 });
             }
 
@@ -935,10 +842,10 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2">
-                        <button onclick="setLibraryFolder('Tất cả')" class="px-4 py-2 rounded-xl text-xs font-semibold transition ${activeLibraryFolder === 'Tất cả' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'}">Tất cả yêu thích (${stories.filter(s => favIds.includes(s.id)).length})</button>
+                        <button onclick="setLibraryFolder('Tất cả')" class="px-4 py-2 rounded-xl text-xs font-semibold transition ${window.activeLibraryFolder === 'Tất cả' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-900 text-gray-300 hover:bg-gray-800 border border-gray-800'}">Tất cả yêu thích (${activeStories.filter(s => favIds.includes(s.id)).length})</button>
                         ${folders.map(folder => `
                             <div class="flex items-center gap-1 px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-xl text-xs font-medium text-gray-300">
-                                <span onclick="setLibraryFolder('${folder}')" class="cursor-pointer hover:text-blue-400 ${activeLibraryFolder === folder ? 'text-blue-400 font-bold' : ''}">🗂️ ${folder}</span>
+                                <span onclick="setLibraryFolder('${folder}')" class="cursor-pointer hover:text-blue-400 ${window.activeLibraryFolder === folder ? 'text-blue-400 font-bold' : ''}">🗂️ ${folder}</span>
                                 <button onclick="deleteLibraryFolder('${folder}')" class="text-red-400 hover:text-red-300 ml-1 font-bold">×</button>
                             </div>
                         `).join('')}
@@ -956,7 +863,7 @@
                                         </button>
 
                                         <div id="story-option-menu-${story.id}" class="story-option-popover hidden absolute top-12 left-2.5 w-48 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl z-30 p-1.5 space-y-1 text-xs" onclick="event.stopPropagation()">
-                                            <button onclick="removeStoryFromCurrentList('${story.id}', '${activeLibraryFolder}')" class="w-full text-left px-3 py-2 hover:bg-red-950/40 text-red-400 rounded-xl font-semibold transition flex items-center gap-2">
+                                            <button onclick="removeStoryFromCurrentList('${story.id}', '${window.activeLibraryFolder}')" class="w-full text-left px-3 py-2 hover:bg-red-950/40 text-red-400 rounded-xl font-semibold transition flex items-center gap-2">
                                                 <span>❌</span> Xóa khỏi danh sách này
                                             </button>
                                             <button onclick="openAddToListModal('${story.id}')" class="w-full text-left px-3 py-2 hover:bg-gray-800 text-gray-200 rounded-xl font-medium transition flex items-center gap-2">
@@ -976,34 +883,33 @@
                     `}
                 </div>
             `;
-        }
+        };
 
-        function handleAddNewFolder() {
+        window.handleAddNewFolder = function() {
             const input = document.getElementById('new-folder-input');
             const val = input.value.trim();
             if (val) {
-                addLibraryFolder(val);
+                window.addLibraryFolder(val);
                 input.value = '';
             } else {
-                showToast("Vui lòng nhập tên danh sách đọc!", "info");
+                window.showToast("Vui lòng nhập tên danh sách đọc!", "info");
             }
-        }
+        };
 
-        function setLibraryFolder(folderName) {
-            activeLibraryFolder = folderName;
-            renderView();
-        }
+        window.setLibraryFolder = function(folderName) {
+            window.activeLibraryFolder = folderName;
+            window.renderView();
+        };
 
-        async function renderAdmin() {
-            const activeStories = await getAllActiveStories();
-            const deletedStories = await getAllDeletedStories();
-            const categories = await getCategoriesDB();
+        window.renderAdmin = function() {
+            const activeStories = window.stories.filter(s => !s.isDeleted);
+            const deletedStories = window.stories.filter(s => s.isDeleted);
 
             return `
                 <div class="max-w-4xl mx-auto space-y-6">
                     <div class="flex justify-between items-center border-b border-gray-800 pb-4">
                         <div class="flex items-center gap-3">
-                            <h1 class="text-2xl font-bold flex items-center gap-2"><span>⚙️</span> Trang Quản Trị Admin</h1>
+                            <h1 class="text-2xl font-bold flex items-center gap-2"><span>⚙️</span> Trang Quản Trị Admin (Cloud)</h1>
                             <span class="text-xs bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 px-3 py-0.5 rounded-full font-semibold">Đã đăng nhập</span>
                         </div>
                         <button onclick="logoutAdmin()" class="px-3.5 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/40 rounded-xl text-xs font-semibold transition">Đăng Xuất Admin</button>
@@ -1015,61 +921,27 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                             <div>
                                 <label class="block font-semibold mb-1 text-gray-300">Tên Website / Thương Hiệu</label>
-                                <input type="text" id="setting-site-title" value="${appSettings.siteTitle}" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
+                                <input type="text" id="setting-site-title" value="${window.appSettings.siteTitle}" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
                             </div>
                             <div>
                                 <label class="block font-semibold mb-1 text-gray-300">Font Chữ Toàn Trang</label>
                                 <select id="setting-site-font" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-gray-200">
-                                    <option value="font-inter" ${appSettings.primaryFont === 'font-inter' ? 'selected' : ''}>Inter (Hiện đại)</option>
-                                    <option value="font-lora" ${appSettings.primaryFont === 'font-lora' ? 'selected' : ''}>Lora (Thơ mộng)</option>
-                                    <option value="font-merriweather" ${appSettings.primaryFont === 'font-merriweather' ? 'selected' : ''}>Merriweather (Cổ điển)</option>
-                                    <option value="font-mono" ${appSettings.primaryFont === 'font-mono' ? 'selected' : ''}>Monospace (Lập trình)</option>
+                                    <option value="font-inter" ${window.appSettings.primaryFont === 'font-inter' ? 'selected' : ''}>Inter (Hiện đại)</option>
+                                    <option value="font-lora" ${window.appSettings.primaryFont === 'font-lora' ? 'selected' : ''}>Lora (Thơ mộng)</option>
+                                    <option value="font-merriweather" ${window.appSettings.primaryFont === 'font-merriweather' ? 'selected' : ''}>Merriweather (Cổ điển)</option>
+                                    <option value="font-mono" ${window.appSettings.primaryFont === 'font-mono' ? 'selected' : ''}>Monospace (Lập trình)</option>
                                 </select>
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block font-semibold mb-1 text-gray-300">Tiêu Đề Banner Trang Chủ</label>
-                                <input type="text" id="setting-hero-head" value="${appSettings.heroHeading}" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
+                                <input type="text" id="setting-hero-head" value="${window.appSettings.heroHeading}" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block font-semibold mb-1 text-gray-300">Mô Tả Phụ Banner</label>
-                                <input type="text" id="setting-hero-sub" value="${appSettings.heroSub}" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
+                                <input type="text" id="setting-hero-sub" value="${window.appSettings.heroSub}" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2">
                             </div>
                         </div>
                         <button onclick="saveAdminThemeSettings()" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-blue-600/20">💾 Lưu Cấu Hình Giao Diện</button>
-                    </div>
-
-                    <!-- SAO LƯU & KHÔI PHỤC DỮ LIỆU JSON -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="bg-gray-900/90 rounded-2xl p-5 border border-gray-800 space-y-3">
-                            <h2 class="font-bold text-base text-blue-400">⬇️ Xuất Dữ Liệu (Backup JSON)</h2>
-                            <p class="text-xs text-gray-400">Tải file JSON chứa toàn bộ truyện, chương và dữ liệu để dán vào code hoặc lưu trữ.</p>
-                            <button onclick="exportAllStoriesJSON()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-600/20">Tải File Backup (.JSON)</button>
-                        </div>
-
-                        <div class="bg-gray-900/90 rounded-2xl p-5 border border-gray-800 space-y-3">
-                            <h2 class="font-bold text-base text-emerald-400">⬆️ Nhập Dữ Liệu (Restore JSON)</h2>
-                            <p class="text-xs text-gray-400">Chọn file JSON đã lưu từ máy khác để đồng bộ ngay lập tức.</p>
-                            <label class="block w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold text-center cursor-pointer transition shadow-lg shadow-emerald-600/20">
-                                Chọn File JSON Để Đồng Bộ
-                                <input type="file" accept=".json" onchange="importStoriesJSON(event)" class="hidden">
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-900/90 rounded-2xl p-5 border border-gray-800 space-y-3">
-                        <h2 class="font-bold text-base text-blue-400">🏷️ Quản Lý Thể Loại & Mục Truyện</h2>
-                        <div class="flex gap-2">
-                            <input type="text" id="admin-new-cat" placeholder="Tạo thể loại mới..." class="flex-1 bg-gray-950 border border-gray-800 rounded-xl px-3 py-1.5 text-xs">
-                            <button onclick="handleAddCategory()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold">Tạo Mục</button>
-                        </div>
-                        <div class="flex flex-wrap gap-2 pt-2">
-                            ${categories.map(cat => `
-                                <div class="bg-gray-950 border border-gray-800 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2">
-                                    <span class="font-semibold text-gray-200">${cat}</span>
-                                    <button onclick="handleDeleteCategory('${cat}')" class="text-red-400 font-bold hover:text-red-300 text-sm ml-1" title="Xóa thể loại này">×</button>
-                                </div>
-                            `).join('')}
-                        </div>
                     </div>
 
                     <div class="bg-gray-900/90 rounded-2xl p-6 border border-gray-800 space-y-4">
@@ -1093,7 +965,7 @@
                     </div>
 
                     <div class="bg-gray-900/90 rounded-2xl p-6 border border-gray-800 space-y-4">
-                        <h2 class="font-bold text-base text-gray-200">📖 Truyện Đang Hoạt Động (${activeStories.length})</h2>
+                        <h2 class="font-bold text-base text-gray-200">📖 Truyện Đang Hoạt Động Trên Cloud (${activeStories.length})</h2>
                         <div class="divide-y divide-gray-800 max-h-80 overflow-y-auto">
                             ${activeStories.map(s => `
                                 <div class="py-3 flex items-center justify-between gap-4">
@@ -1108,97 +980,80 @@
                     </div>
                 </div>
             `;
-        }
+        };
 
-        function saveAdminThemeSettings() {
-            appSettings.siteTitle = document.getElementById('setting-site-title').value.trim() || 'TruyệnHay';
-            appSettings.primaryFont = document.getElementById('setting-site-font').value;
-            appSettings.heroHeading = document.getElementById('setting-hero-head').value.trim();
-            appSettings.heroSub = document.getElementById('setting-hero-sub').value.trim();
+        window.saveAdminThemeSettings = function() {
+            window.appSettings.siteTitle = document.getElementById('setting-site-title').value.trim() || 'TruyệnHay';
+            window.appSettings.primaryFont = document.getElementById('setting-site-font').value;
+            window.appSettings.heroHeading = document.getElementById('setting-hero-head').value.trim();
+            window.appSettings.heroSub = document.getElementById('setting-hero-sub').value.trim();
 
-            localStorage.setItem('app_admin_settings', JSON.stringify(appSettings));
-            showToast("Đã lưu cài đặt giao diện thành công!");
-            renderView();
-        }
+            localStorage.setItem('app_admin_settings', JSON.stringify(window.appSettings));
+            window.showToast("Đã lưu cài đặt giao diện thành công!");
+            window.renderView();
+        };
 
-        async function handleAddCategory() {
-            const val = document.getElementById('admin-new-cat').value.trim();
-            if (val) {
-                await saveCategoryDB({ name: val });
-                showToast(`Đã tạo thể loại "${val}"`);
-                renderView();
-            }
-        }
-
-        function handleDeleteCategory(name) {
-            showCustomModal("Xóa thể loại", `Bạn có chắc chắn muốn xóa thể loại "${name}"?`, async () => {
-                await removeCategoryDB(name);
-                showToast(`Đã xóa thể loại "${name}"`);
-                renderView();
-            });
-        }
-
-        async function restoreStory(id) {
-            const stories = await getAllStoriesRaw();
-            const story = stories.find(s => s.id === id);
+        window.restoreStory = async function(id) {
+            const story = window.stories.find(s => String(s.id) === String(id));
             if (story) {
                 story.isDeleted = false;
                 await saveStoryDB(story);
-                showToast("Đã khôi phục truyện!");
-                renderView();
+                window.showToast("Đã khôi phục truyện!");
             }
-        }
+        };
 
-        function deletePermanent(id) {
-            showCustomModal("Xóa vĩnh viễn", "Hành động này sẽ xóa vĩnh viễn truyện và không thể khôi phục!", async () => {
+        window.deletePermanent = function(id) {
+            window.showCustomModal("Xóa vĩnh viễn", "Hành động này sẽ xóa vĩnh viễn truyện khỏi cloud và không thể khôi phục!", async () => {
                 await deleteStoryPermanentDB(id);
-                showToast("Đã xóa vĩnh viễn truyện!");
-                renderView();
+                window.showToast("Đã xóa vĩnh viễn truyện!");
             });
-        }
+        };
 
-        async function exportAllStoriesJSON() {
-            const stories = await getAllStoriesRaw();
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stories, null, 2));
-            const a = document.createElement('a');
-            a.setAttribute("href", dataStr);
-            a.setAttribute("download", `truyenhay_backup_${Date.now()}.json`);
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            showToast("Đã xuất file dữ liệu sao lưu!");
-        }
+        window.showCustomModal = function(title, msg, onConfirm) {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-msg').innerText = msg;
+            modal.classList.remove('hidden');
 
-        function importStoriesJSON(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
 
-            const reader = new FileReader();
-            reader.onload = async function(event) {
-                try {
-                    const importedStories = JSON.parse(event.target.result);
-                    if (!Array.isArray(importedStories)) {
-                        throw new Error("File JSON không hợp lệ");
-                    }
-
-                    for (let story of importedStories) {
-                        if (story.id) {
-                            await saveStoryDB(story);
-                        }
-                    }
-
-                    showToast("Đã đồng bộ dữ liệu thành công!");
-                    router('home');
-                } catch (err) {
-                    showToast("Lỗi: File JSON không đúng định dạng!", "info");
-                }
+            const cleanup = () => {
+                modal.classList.add('hidden');
+                confirmBtn.onclick = null;
+                cancelBtn.onclick = null;
             };
-            reader.readAsText(file);
-        }
 
-        window.addEventListener('DOMContentLoaded', async () => {
-            await initDB();
-            renderView();
+            confirmBtn.onclick = () => { cleanup(); onConfirm(); };
+            cancelBtn.onclick = () => cleanup();
+        };
+
+        // --- FIRESTORE REALTIME LISTENER ---
+        onSnapshot(collection(dbFirestore, "stories"), (snapshot) => {
+            window.stories = [];
+            snapshot.forEach((docSnap) => {
+                window.stories.push(docSnap.data());
+            });
+
+            // Nếu chưa có dữ liệu nào trên cloud, tự động đẩy truyện mẫu lên
+            if (window.stories.length === 0) {
+                const sampleStory = {
+                    id: 'sample-1',
+                    title: 'Toàn Trí Độc Giả (Cloud)',
+                    author: 'Sing N Song',
+                    description: 'Bộ truyện thử nghiệm đồng bộ thời gian thực qua Firebase Firestore.',
+                    cover: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&q=80',
+                    categories: ['Huyền Huyễn', 'Hệ Thống'],
+                    tags: ['Action', 'Survival'],
+                    isDeleted: false,
+                    chapters: [
+                        { title: 'Chương 1: Khởi đầu đám mây', content: 'Nội dung đồng bộ thời gian thực thành công!' }
+                    ]
+                };
+                saveStoryDB(sampleStory);
+            }
+
+            window.renderView();
         });
     </script>
 </body>
